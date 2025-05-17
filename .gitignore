@@ -1,0 +1,5 @@
+.venv
+uploads/*
+!uploads/.gitkeep
+static/*
+!static/.gitkeep

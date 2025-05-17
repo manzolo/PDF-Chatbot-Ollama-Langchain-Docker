@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF AI Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-12 max-w-3xl">
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-indigo-700 mb-2">PDF AI Analyzer</h1>
+            <p class="text-gray-600">Upload a PDF and interact with its content</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md overflow-hidden p-8">
+            <form id="uploadForm" class="space-y-6" enctype="multipart/form-data">
+                <div class="flex items-center justify-center w-full">
+                    <label for="pdfUpload" class="flex flex-col items-center justify-center w-full h-64 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <i class="fas fa-file-pdf text-5xl text-indigo-500 mb-4"></i>
+                            <p class="mb-2 text-lg text-gray-700"><span class="font-semibold">Upload</span> your PDF</p>
+                            <p class="text-sm text-gray-500">PDF (max. 15MB)</p>
+                        </div>
+                        <input id="pdfUpload" name="file" type="file" class="hidden" accept=".pdf" required>
+                    </label>
+                </div>
+
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center">
+                    <i class="fas fa-robot mr-2"></i> Analize
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    window.location.href = `/chat/${data.filename}`;
+                } else {
+                    alert('Errore nel caricamento del file');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Si è verificato un errore');
+            }
+        });
+    </script>
+</body>
+</html>
