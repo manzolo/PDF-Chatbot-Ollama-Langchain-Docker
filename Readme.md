@@ -27,8 +27,8 @@ To run this application using Docker, you will need:
 1.  **Clone the repository:**
 
     ```bash
-    git clone [YOUR_REPOSITORY_URL]
-    cd [YOUR_REPOSITORY_NAME]
+    git clone https://github.com/manzolo/PDF-Chatbot-Ollama-Langchain-Docker
+    cd PDF-Chatbot-Ollama-Langchain-Docker
     ```
 
 2.  **`.env` file:** Configure the following variables:
@@ -43,7 +43,7 @@ To run this application using Docker, you will need:
 3.  **Run the application:**
 
     ```bash
-    docker-compose up --build
+    docker compose up --build
     ```
 
     This command will build the Docker image (if necessary) and start the application container.
