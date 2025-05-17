@@ -2,9 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Installa le dipendenze di sistema per PDF e testo
+# Install system deps for PDF → image conversion and OCR
 RUN apt-get update && apt-get install -y \
     poppler-utils \
+    tesseract-ocr \
+    libtesseract-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

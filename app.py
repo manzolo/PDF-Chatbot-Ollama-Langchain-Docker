@@ -4,16 +4,20 @@ import atexit
 import shutil
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
 from flask import Flask, request, render_template, send_from_directory, jsonify
 from werkzeug.utils import secure_filename
 from langchain_ollama import OllamaLLM, OllamaEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
+from langchain.schema import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain.chains import RetrievalQA
 from chromadb.config import Settings
+import pytesseract
+from pytesseract import TesseractNotFoundError
+from pdf2image import convert_from_path
 
 # Load environment variables
 dotenv_path = Path(__file__).parent / '.env'
@@ -33,8 +37,9 @@ app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
 
-# Store for the current vector index
+# Store for the current vector index and last processed file
 app.current_vector_store: Optional[Chroma] = None
+app.last_pdf_path: Optional[Path] = None
 
 # Cleanup at exit
 def _cleanup_files_and_store():
@@ -78,18 +83,47 @@ def clean_previous_store():
             logger.warning('Error deleting previous vector store: %s', err)
         finally:
             app.current_vector_store = None
+            app.last_pdf_path = None
 
 
-def split_pdf_to_chunks(filepath: Path, chunk_size: int, chunk_overlap: int):
-    """Load a PDF and split into text chunks."""
+def ocr_pdf(filepath: Path) -> List[Document]:
+    """Convert PDF pages to images and extract text via OCR."""
+    docs: List[Document] = []
+    try:
+        images = convert_from_path(str(filepath))
+    except Exception as e:
+        logger.warning('Failed to convert PDF to images for OCR: %s', e)
+        return docs
+
+    for i, img in enumerate(images):
+        try:
+            text = pytesseract.image_to_string(img)
+        except TesseractNotFoundError:
+            logger.warning('Tesseract executable not found; skipping OCR.')
+            break
+        if text.strip():
+            docs.append(Document(page_content=text, metadata={'page': i+1, 'source': str(filepath)}))
+    return docs
+
+
+def split_pdf_to_chunks(filepath: Path, chunk_size: int, chunk_overlap: int) -> List[Document]:
+    """Load a PDF, extract native text, OCR images, then split into chunks."""
+    # Extract native text
     loader = PyPDFLoader(str(filepath))
     pages = loader.load()
+
+    # OCR for scanned pages / images
+    ocr_docs = ocr_pdf(filepath)
+
+    # Combine both sources
+    all_docs = pages + ocr_docs
+
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
         separators=["\n\n", "\n", " ", ""]
     )
-    return splitter.split_documents(pages)
+    return splitter.split_documents(all_docs)
 
 
 def create_vector_store(
@@ -107,7 +141,7 @@ def create_vector_store(
     return store
 
 
-def build_retrieval_qa(store: Chroma, host: str, model: str, temperature: float, k: int):
+def build_retrieval_qa(store: Chroma, host: str, model: str, temperature: float, k: int) -> RetrievalQA:
     """Instantiate a RetrievalQA chain from a vector store."""
     retriever = store.as_retriever(search_kwargs={'k': k})
     llm = OllamaLLM(base_url=host, model=model, temperature=temperature)
@@ -125,24 +159,34 @@ def process_pdf(
     Process a PDF file to produce a RetrievalQA agent.
 
     Steps:
-    1. Clean any existing vector store.
-    2. Split the PDF into text chunks.
-    3. Build a new vector store.
-    4. Return a RetrievalQA chain.
+    1. If the same PDF was processed before, reuse existing store.
+    2. Otherwise, clean existing store and index new PDF.
+    3. Return a RetrievalQA chain.
     """
     if not filepath.is_file() or filepath.suffix.lower() != '.pdf':
         logger.error('Invalid PDF file: %s', filepath)
         raise ValueError(f"Invalid PDF file: {filepath}")
 
+    # Reuse store if same file
+    if app.last_pdf_path == filepath and app.current_vector_store:
+        logger.info('Reusing existing vector store for %s', filepath)
+        return build_retrieval_qa(
+            app.current_vector_store,
+            *validate_environment(),
+            temperature,
+            top_k
+        )
+
+    # Otherwise clean and rebuild
     clean_previous_store()
     host, model = validate_environment()
 
     documents = split_pdf_to_chunks(filepath, chunk_size, chunk_overlap)
     store = create_vector_store(documents, host, model)
     app.current_vector_store = store
+    app.last_pdf_path = filepath
 
     return build_retrieval_qa(store, host, model, temperature, top_k)
-
 
 @app.route('/', methods=['GET'])
 def upload_page():
