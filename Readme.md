@@ -52,3 +52,7 @@ The application will be available at `http://127.0.0.1:5000/` in your browser. E
 
 ## Screenshot
 
+![immagine](https://github.com/user-attachments/assets/f066e7db-ef13-4f88-9cd2-c68a4a67fe8e)
+
+![immagine](https://github.com/user-attachments/assets/96237422-ac16-4878-8b61-52761d3856c9)
+
