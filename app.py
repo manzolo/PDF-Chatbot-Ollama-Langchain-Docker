@@ -19,6 +19,8 @@ import pytesseract
 from pytesseract import TesseractNotFoundError
 from pdf2image import convert_from_path
 
+document_params = {}
+
 # Load environment variables
 dotenv_path = Path(__file__).parent / '.env'
 if dotenv_path.exists():
@@ -227,7 +229,21 @@ def ask_question():
     if not pdf_path.exists():
         return jsonify({'error': 'File not found'}), 404
 
-    qa_agent = process_pdf(pdf_path)
+    # Usa i parametri specifici se presenti
+    params = document_params.get(filename, {})
+    chunk_size = int(params.get('chunk_size', 1000))
+    chunk_overlap = int(params.get('chunk_overlap', 200))
+    top_k = int(params.get('top_k', 4))
+    temperature = float(params.get('temperature', 0.3))
+
+    qa_agent = process_pdf(
+        pdf_path,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        top_k=top_k,
+        temperature=temperature
+    )
+
     response = qa_agent.invoke({'query': query})
     answer = response.get('result', '')
 
@@ -253,6 +269,27 @@ def chat_page(filename):
 @app.route('/uploads/<path:filename>')
 def serve_pdf(filename):
     return send_from_directory(str(app.config['UPLOAD_FOLDER']), filename)
+
+# Aggiungi questa route
+@app.route('/update_params', methods=['POST'])
+def update_params():
+    data = request.get_json()
+    filename = data.get('filename')
+    params = data.get('params')
+    
+    if not filename or not params:
+        return jsonify({'error': 'Parametri mancanti'}), 400
+    
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'File non trovato'}), 404
+    
+    # Qui puoi salvare i parametri o applicarli direttamente
+    # Esempio: salvarli in un dizionario globale
+    global document_params
+    document_params[filename] = params
+    
+    return jsonify({'message': 'Parametri aggiornati'}), 200
 
 
 if __name__ == '__main__':

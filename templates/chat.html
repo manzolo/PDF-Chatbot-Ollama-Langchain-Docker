@@ -1,11 +1,28 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat con PDF | {{ filename }}</title>
+    <title>Chat with PDF | {{ filename }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        indigo: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
@@ -14,12 +31,62 @@
                 <i class="fas fa-robot mr-2"></i> PDF Analyzer
             </h1>
             <a href="/" class="text-indigo-600 hover:text-indigo-800">
-                <i class="fas fa-upload mr-1"></i> Upload new PDF
+                <i class="fas fa-upload mr-1"></i> New PDF
             </a>
         </header>
 
         <div class="bg-white rounded-xl shadow-md overflow-hidden mb-6">
-            <!-- PDF Accordion Header -->
+            <button id="paramsToggle" class="w-full flex justify-between items-center p-4 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+                <span class="font-medium text-indigo-700">
+                    <i class="fas fa-sliders-h mr-2"></i> Analysis Parameters
+                </span>
+                <i class="fas fa-chevron-down transition-transform" id="paramsToggleIcon"></i>
+            </button>
+
+            <div id="paramsContainer" class="hidden border-t p-4 space-y-4">
+                <div>
+                    <label for="chunkSize" class="block text-sm font-medium text-gray-700 mb-1">
+                        Chunk Size: <span id="chunkSizeValue">1000</span> characters
+                        <p class="text-xs text-gray-500">Determines the size of the text segments the PDF is split into.</p>
+                    </label>
+                    <input type="range" id="chunkSize" min="500" max="2000" step="100" value="1000"
+                           class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <div>
+                    <label for="chunkOverlap" class="block text-sm font-medium text-gray-700 mb-1">
+                        Chunk Overlap: <span id="chunkOverlapValue">200</span> characters
+                        <p class="text-xs text-gray-500">Specifies the number of overlapping characters between consecutive text segments, helping to maintain context.</p>
+                    </label>
+                    <input type="range" id="chunkOverlap" min="50" max="500" step="50" value="200"
+                           class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <div>
+                    <label for="topK" class="block text-sm font-medium text-gray-700 mb-1">
+                        Relevant Results (top_k): <span id="topKValue">4</span>
+                        <p class="text-xs text-gray-500">Indicates how many of the most relevant text segments are retrieved to answer your query.</p>
+                    </label>
+                    <input type="range" id="topK" min="1" max="10" step="1" value="4"
+                           class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <div>
+                    <label for="temperature" class="block text-sm font-medium text-gray-700 mb-1">
+                        Response Creativity (temperature): <span id="temperatureValue">0.3</span>
+                        <p class="text-xs text-gray-500">Controls the randomness of the AI's responses. Lower values (e.g., 0) make responses more deterministic and focused, while higher values (e.g., 1) make them more creative and potentially less focused.</p>
+                    </label>
+                    <input type="range" id="temperature" min="0" max="1" step="0.1" value="0.3"
+                           class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <button id="saveParams" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                    <i class="fas fa-save mr-2"></i> Save Parameters
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md overflow-hidden mb-6">
             <button id="pdfToggle" class="w-full flex justify-between items-center p-4 bg-indigo-50 hover:bg-indigo-100 transition-colors">
                 <span class="font-medium text-indigo-700">
                     <i class="fas fa-file-pdf mr-2"></i> {{ filename }}
@@ -27,13 +94,11 @@
                 <i class="fas fa-chevron-down transition-transform" id="pdfToggleIcon"></i>
             </button>
 
-            <!-- PDF Viewer (collapsed by default) -->
             <div id="pdfViewerContainer" class="hidden border-t">
                 <iframe id="pdfViewer" src="{{ url_for('serve_pdf', filename=filename) }}" class="w-full h-[500px]"></iframe>
             </div>
         </div>
 
-        <!-- Chat Container -->
         <div class="bg-white rounded-xl shadow-md overflow-hidden">
             <div class="p-4 border-b bg-gray-50">
                 <h2 class="font-medium text-gray-700">
@@ -41,13 +106,11 @@
                 </h2>
             </div>
 
-            <!-- Chat Messages -->
             <div id="chatMessages" class="p-4 h-96 overflow-y-auto space-y-4"></div>
 
-            <!-- Chat Input -->
             <div class="p-4 border-t bg-gray-50">
                 <form id="chatForm" class="flex gap-2">
-                    <input type="text" name="query" placeholder="Write your question..." 
+                    <input type="text" name="query" placeholder="Write your question..."
                            class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400" required>
                     <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors">
                         <i class="fas fa-paper-plane"></i>
@@ -58,6 +121,34 @@
     </div>
 
     <script>
+        // Slider Updates
+        document.getElementById('chunkSize').addEventListener('input', (e) => {
+            document.getElementById('chunkSizeValue').textContent = e.target.value;
+        });
+
+        document.getElementById('chunkOverlap').addEventListener('input', (e) => {
+            document.getElementById('chunkOverlapValue').textContent = e.target.value;
+        });
+
+        document.getElementById('topK').addEventListener('input', (e) => {
+            document.getElementById('topKValue').textContent = e.target.value;
+        });
+
+        document.getElementById('temperature').addEventListener('input', (e) => {
+            document.getElementById('temperatureValue').textContent = e.target.value;
+        });
+
+        // Parameters Accordion Toggle
+        const paramsToggle = document.getElementById('paramsToggle');
+        const paramsContainer = document.getElementById('paramsContainer');
+        const paramsToggleIcon = document.getElementById('paramsToggleIcon');
+
+        paramsToggle.addEventListener('click', () => {
+            paramsContainer.classList.toggle('hidden');
+            paramsToggleIcon.classList.toggle('fa-chevron-down');
+            paramsToggleIcon.classList.toggle('fa-chevron-up');
+        });
+
         // PDF Accordion Toggle
         const pdfToggle = document.getElementById('pdfToggle');
         const pdfContainer = document.getElementById('pdfViewerContainer');
@@ -69,23 +160,73 @@
             pdfToggleIcon.classList.toggle('fa-chevron-up');
         });
 
-        // AJAX Chat
+        // Save Parameters (AJAX)
+        document.getElementById('saveParams').addEventListener('click', async (e) => {
+            e.preventDefault();
+
+            const params = {
+                chunk_size: parseInt(document.getElementById('chunkSize').value),
+                chunk_overlap: parseInt(document.getElementById('chunkOverlap').value),
+                top_k: parseInt(document.getElementById('topK').value),
+                temperature: parseFloat(document.getElementById('temperature').value)
+            };
+
+            try {
+                const response = await fetch('/update_params', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        filename: '{{ filename }}',
+                        params: params
+                    })
+                });
+
+                if (response.ok) {
+                    // Instead of a simple alert, you can provide more subtle feedback
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative';
+                    messageDiv.innerHTML = '<strong class="font-bold">Success!</strong> <span class="block sm:inline">Parameters updated successfully.</span>';
+                    paramsContainer.prepend(messageDiv); // Add message at the top of the parameters section
+
+                    // Automatically fade out the message after a few seconds
+                    setTimeout(() => {
+                        messageDiv.remove();
+                    }, 3000);
+                } else {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative';
+                    errorDiv.innerHTML = '<strong class="font-bold">Error!</strong> <span class="block sm:inline">Failed to update parameters.</span>';
+                    paramsContainer.prepend(errorDiv);
+
+                    setTimeout(() => {
+                        errorDiv.remove();
+                    }, 3000);
+                    throw new Error('Saving error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        });
+
+        // AJAX Chat (remains the same)
         const chatForm = document.getElementById('chatForm');
         const chatMessages = document.getElementById('chatMessages');
 
         function addMessage(role, content) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = role === 'user' 
+            messageDiv.className = role === 'user'
                 ? 'bg-indigo-50 p-3 rounded-lg max-w-[80%] ml-auto'
                 : 'bg-gray-100 p-3 rounded-lg max-w-[80%]';
-            
+
             messageDiv.innerHTML = `
                 <div class="font-medium text-sm mb-1 ${role === 'user' ? 'text-indigo-700' : 'text-gray-700'}">
-                    ${role === 'user' ? '<i class="fas fa-user mr-1"></i> Tu' : '<i class="fas fa-robot mr-1"></i> AI'}
+                    ${role === 'user' ? '<i class="fas fa-user mr-1"></i> You' : '<i class="fas fa-robot mr-1"></i> AI'}
                 </div>
                 <div class="text-gray-800">${content}</div>
             `;
-            
+
             chatMessages.appendChild(messageDiv);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -95,12 +236,10 @@
             const query = e.target.query.value.trim();
             if (!query) return;
 
-            // Add user message
             addMessage('user', query);
             e.target.query.value = '';
 
             try {
-                // Get AI response
                 const response = await fetch('/ask', {
                     method: 'POST',
                     headers: {
@@ -116,11 +255,11 @@
                     const data = await response.json();
                     addMessage('ai', data.answer);
                 } else {
-                    throw new Error('Errore nella risposta');
+                    throw new Error('Response error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                addMessage('ai', '⚠️ An error occurred during the response generation');
+                addMessage('ai', '⚠️ An error occurred while generating the response');
             }
         });
     </script>
